@@ -27,6 +27,9 @@ int done;
 // store the number of process has start running
 int started;
 
+int queue[3000];
+int head, tail;
+
 int cmp(const void *first, const void *second) {
 	return ((struct Process *) first) -> ready_time - ((struct Process *) second) -> ready_time;
 }
@@ -46,24 +49,26 @@ int Find_Next(struct Process *process, int Num_of_Process, int policy)
 
     else if(policy == RR)
     {
-        if(started == 0)
-	    return -1;
-	else if(now == -1)
-	{
-	    for(int i = 0; i < Num_of_Process; i++)
-	    {	
-		if(process[i].pid != -1 && process[i].execu_time != 0)
-		    return i;
-	    }	
-
-	}
-	else if ((total_time - RR_time) % 500 == 0)
+        if(head == tail)
+            return now;
+        else if(now == -1)
         {
-            int RR_now = (now + 1) % Num_of_Process;
-            while (process[RR_now].pid == -1 || process[RR_now].execu_time == 0)
-                RR_now = (RR_now + 1) % Num_of_Process;
-	    //fprintf(stderr, "total_time = %d now = %d RR_now = %d \n", total_time, now, RR_now);
-            return RR_now;
+            int new = queue[head];
+            head = (head + 1) % 3000;
+            return new;
+        }
+        else if ((total_time - RR_time) % 500 == 0)
+        {
+            if(head == tail)
+                return now;
+            else
+            {
+                int new = queue[head];
+                head = (head + 1) % 3000;
+                queue[tail] = now;
+                tail = (tail + 1) % 3000;
+                return new;
+            }
         }
         else
             return now;
@@ -94,44 +99,50 @@ int Scheduling(struct Process *process, int Num_of_Process, int policy)
     Run_Process(getpid());
 
     qsort(process, Num_of_Process, sizeof(struct Process), cmp);
-    
+
     for(int i = 0 ; i < Num_of_Process; i++)
-	process[i].pid = -1;
-    
+        process[i].pid = -1;
+
     now = -1;
     done = 0;
+    head = 0;
+    tail = 0;
     started = 0;
     FIFO_now = -1;
     total_time = 0;
-    
     while(1)
     {
-	while(started < Num_of_Process && process[started].ready_time == total_time)
-	{	
-	    //fprintf(stderr, "now %d run %s\n", total_time, process[started].name);
-	    process[started].pid = Execute_Process(process[started]);
-	    Stop_Process(process[started].pid);
+        while(started < Num_of_Process && process[started].ready_time == total_time)
+        {	
+            //fprintf(stderr, "now %d run %s\n", total_time, process[started].name);
+            process[started].pid = Execute_Process(process[started]);
+            Stop_Process(process[started].pid);
+            if(policy == RR)
+            {
+                queue[tail] = started;
+                tail = (tail + 1) % 3000;
+            }
 	    started++;
-	}	
+        }	
         if(now != -1 && process[now].execu_time == 0)
         {
-	    //fprintf(stderr, "%s done at %d\n", process[now].name, total_time);
+            //fprintf(stderr, "%s done at %d\n", process[now].name, total_time);
             waitpid(process[now].pid, NULL, 0);
             printf("%s %d\n", process[now].name, process[now].pid);
-	    fflush(stdout);
+            fflush(stdout);
             now = -1;
             if(++done == Num_of_Process)
                 break;
         }
 
         int next = Find_Next(process, Num_of_Process, policy);
-	
+
         if(next == -1)
         {
-	    A_UNIT_TIME(); 
-	    total_time++;
-	    continue;
-	}
+            A_UNIT_TIME(); 
+            total_time++;
+            continue;
+        }
         else if(next != now)
         {
             Run_Process(process[next].pid);
