@@ -6,5 +6,5 @@
 
 asmlinkage int PRINTK(unsigned long a, unsigned long b, unsigned long c, unsigned long d, int pid)
 {
-	printk("[Project1] %d %lu.%09lu %lu.%09lu\n", pid, a, b, c, d);
+	printk("[project1] %d %lu.%09lu %lu.%09lu\n", pid, a, b, c, d);
 }
